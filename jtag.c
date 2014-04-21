@@ -102,15 +102,33 @@ int main(int argc, char **argv) {
 	if ((n = jtag_enumerate(jtag)) <= 0)
 		return -1;
 
+#if 0
 	if (jtag_select(jtag, 0x4ba00477))
 		return -1;
-
 	if (jtag_ir_wr(jtag, DAP_IR_IDCODE))
+		return -1;
+	if (jtag_dr_io(jtag, 32, 0, &u))
+		return -1;
+#endif
+
+	u = 0xaaaaaaaa;
+	if (jtag_select(jtag, 0x13722093))
+		return -1;
+	if (jtag_ir_wr(jtag, XIL_IDCODE))
 		return -1;
 	if (jtag_dr_io(jtag, 32, 0, &u))
 		return -1;
 	fprintf(stderr,"idcode? %08lx\n", u);
 
+	jtag_ir_wr(jtag, XIL_USER4);
+	jtag_dr_io(jtag, 32, 0x12345678, &u);
+	fprintf(stderr, "user4 %08lx\n", u);
+	jtag_dr_io(jtag, 32, 0xa7a7a7a7, &u);
+	fprintf(stderr, "user4 %08lx\n", u);
+	jtag_dr_io(jtag, 32, 0xa7a7a7a7, &u);
+	fprintf(stderr, "user4 %08lx\n", u);
+ 
+#if 0
 	jtag_dp_rd(jtag, DPACC_CSW, &x);
 	fprintf(stderr,"CSW %08x\n", x);
 
@@ -125,6 +143,7 @@ int main(int argc, char **argv) {
 
 	jtag_ap_rd(jtag, APACC_IDR, &x);
 	fprintf(stderr,"idr %08x\n", x);
+#endif
 
 #if STRESSTEST
 	for (n = 0; n < 0xFFFFFFFF; n++) { 
@@ -142,10 +161,10 @@ int main(int argc, char **argv) {
 	jtag_ap_wr(jtag, APACC_TAR, 0x12345678);
 #endif
 
+#if 0
 	jtag_ap_rd(jtag, APACC_TAR, &x);
 	fprintf(stderr,"tar %08x\n", x);
 
-#if 0
 	fprintf(stderr,"done\n");
 	jtag_dp_wr(jtag, DPACC_CSW, 0);
 #endif

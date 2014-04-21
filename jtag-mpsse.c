@@ -359,7 +359,7 @@ int _jtag_shift(JTAG *jtag, int count, u64 bits, u64 *out,
 	return 0;
 }
 
-#define ONES(n) (0xFFFFFFFFFFFFFFFFULL >> ((64 - (n))))
+#define ONES(n) (0x7FFFFFFFFFFFFFFFULL >> (63 - (n)))
 
 static int jtag_shift_dr(JTAG *jtag, int count, u64 bits,
 	u64 *out, int movecount, unsigned movebits) {
