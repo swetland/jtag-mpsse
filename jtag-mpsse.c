@@ -219,6 +219,22 @@ static int jtag_move(JTAG *jtag, int count, unsigned bits){
 	if (count > 32)
 		return -1;
 
+#if TRACE_JTAG
+	{
+		u64 tmp = bits;
+		int n;
+		fprintf(stderr,"TDI <- ");
+		for (n = 0; n < count; n++) {
+			fprintf(stderr, "X");
+		}
+		fprintf(stderr,"\nTMS <- ");
+		for (n = 0; n < count; n++) {
+			fprintf(stderr,"%c", (tmp & 1) ? '1' : '0');
+			tmp >>= 1;
+		}
+		fprintf(stderr,"\n");
+	}
+#endif
 	while (count > 0) {
 		xfer = (count > 6) ? 6 : count;
 		*p++ = 0x4b;
@@ -251,6 +267,29 @@ int _jtag_shift(JTAG *jtag, int count, u64 bits, u64 *out,
 	if (count <= 0)
 		return -1;
 
+#if TRACE_JTAG
+	{
+		u64 tmp = bits;
+		int n;
+		fprintf(stderr,"TDI <- ");
+		for (n = 0; n < count; n++) {
+			fprintf(stderr,"%c", (tmp & 1) ? '1' : '0');
+			tmp >>= 1;
+		}
+		for (n = 0; n < movebits; n++)
+			fprintf(stderr,"%c", (tmp & 1) ? '1' : '0');
+		fprintf(stderr,"\nTMS <- ");
+		for (n = 0; n < count; n++)
+			fprintf(stderr,"0");
+		tmp = movebits;
+		for (n = 0; n < movebits; n++) {
+			fprintf(stderr,"%c", (tmp & 1) ? '1' : '0');
+			tmp >>= 1;
+		}
+		fprintf(stderr,"\n");
+	}
+#endif
+
 	bytes = count / 8;
 	readbytes = bytes;
 	iobytes = bytes;
@@ -281,7 +320,7 @@ int _jtag_shift(JTAG *jtag, int count, u64 bits, u64 *out,
 		if (movebits > 6)
 			return -1; /* TODO */
 		*p++ = out ? 0x6b : 0x4b;
-		*p++ = movebits;
+		*p++ = movecount - 1;
 		*p++ = ((bits & 1) << 7) | (movebits & 0x3F);
 		iobytes++;
 	}
@@ -294,7 +333,7 @@ int _jtag_shift(JTAG *jtag, int count, u64 bits, u64 *out,
 		return -1;
 
 	if (out) {
-		u64 n = 0;
+		u64 n = 0, bit;
 		unsigned shift = 0;
 		if (ftdi_read(jtag, buf, iobytes, 1000))
 			return -1;
@@ -305,12 +344,15 @@ int _jtag_shift(JTAG *jtag, int count, u64 bits, u64 *out,
 		}
 		while (readbits > 0) {
 			xfer = (readbits > 6) ? 6 : readbits;
-			n |= ((*p++ & bitxfermask[xfer]) << shift);
-			shift <<= xfer;
+			bit = ((*p++) >> (8 - xfer)) & bitxfermask[xfer];
+			n |= (bit << shift);
+			shift += xfer;
 			readbits -= xfer;
 		}
 		if (movecount) {
-			n |= ((*p++ & bitxfermask[movecount]) << shift);
+			/* we only ever care about the first bit */
+			bit = ((*p++) >> (8 - movecount)) & 1;
+			n |= (bit << shift);
 		}
 		*out = n;
 	}
@@ -364,7 +406,7 @@ static int jtag_shift_ir(JTAG *jtag, int count, u64 bits,
 #define MOVE_ANY_TO_RESET_IDLE	8,0b01111111
 #define MOVE_IDLE_TO_SHIFTDR	3,0b001
 #define MOVE_IDLE_TO_SHIFTIR	4,0b0011
-#define MOVE_SHIFTxR_TO_IDLE	2,0b011
+#define MOVE_SHIFTxR_TO_IDLE	3,0b011
 
 
 void jtag_close(JTAG *jtag) {
