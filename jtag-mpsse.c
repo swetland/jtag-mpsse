@@ -481,7 +481,9 @@ int jtag_enumerate(JTAG *jtag) {
 		}
 		if (u == ENUM_MAGIC) {
 			jtag->dev_count = n;
+#if TRACE_JTAG
 			fprintf(stderr, "jtag: found %d devices\n", jtag->dev_count);
+#endif
 			goto okay;
 		}
 	}
@@ -506,9 +508,11 @@ okay:
 			return -1;
 		}
 		jtag->dev_irsize[n] = jtag->dev_info[n]->irsize;
+#if TRACE_JTAG
 		fprintf(stderr, "jtag: device %2d idcode %08x irsize %2d '%s'\n",
 			n, jtag->dev_idcode[n], jtag->dev_irsize[n],
 			jtag->dev_info[n]->name);
+#endif
 	}
 	return jtag->dev_count;
 }
@@ -547,10 +551,11 @@ int jtag_select(JTAG *jtag, u32 idcode) {
 
 	jtag->active_idcode = idcode;
 	jtag->active_irsize = irsize;
+#if TRACE_JTAG
 	fprintf(stderr,"jtag: select idcode %08x\n", idcode);
 	fprintf(stderr,"jtag: TDI -> irpost(%d) -> iract(%d) -> irpre(%d) -> TDO\n",
 		ir_post, irsize, ir_pre);
-
+#endif
 	jtag->dr_pre = dr_pre;
 	jtag->dr_post = dr_post;
 	jtag->ir_pre = ir_pre;
