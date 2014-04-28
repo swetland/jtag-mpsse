@@ -20,6 +20,10 @@
 #include "jtag.h"
 #include "zynq.h"
 
+#include "i2c.h"
+
+#define TRACE_TXN 0
+
 static JTAG *jtag;
 
 void jconnect(void) {
@@ -65,57 +69,83 @@ u32 jwr(u32 n) {
 #define LOST    0x4000 // ro - arbitration lost
 #define BUSY    0x8000 // ro - I2C bus busy
 
-/* example:  ./i2c sw:a0 w:fa sw:a1 r r r r r r p  */
-
-int main(int argc, char **argv) {
-	unsigned n,x;
-	unsigned c;
-
-	argc--;
-	argv++;
-
-	jconnect();
-
-	while (argc > 0) {
-		char *cmd = argv[0];
-		n = 0;
-		while (*cmd) {
-			switch(*cmd) {
-			case 's': case 'S': n |= STA; break;
-			case 'p': case 'P': n |= STP; break;
-			case 'w': case 'W': n |= WR; break;
-			case 'r': case 'R': n |= RD; break;
-			case 'z': case 'Z': n |= RACK; break;
-			case ':':
-				cmd++;
-				n |= (strtoul(cmd, 0, 16) & 0xFF);
-				goto done;
-			default:
-				fprintf(stderr,"syntax error\n");
-				return -1;
-			}
-			cmd++;
+static int i2c_txn(unsigned cmd, unsigned *_status) {
+	unsigned timeout = 0;
+	unsigned status;
+	jwr(cmd);
+	while ((status = jrd()) & TIP) {
+		timeout++;
+		if (timeout == 10000) {
+#if TRACE_TXN
+			fprintf(stderr,"txn: %04x XXXX\n",cmd); 
+#endif
+			fprintf(stderr, "i2c: txn timeout\n");
+			return -1;
 		}
-done:
-		jwr(n);
-		c = 1;
-		while ((x = jrd()) & TIP) {
-			c++;
-			if (c == 100000) {
-				fprintf(stderr,"timeout\n");
-				return -1;
-			}
-		}
-
-		fprintf(stderr, "%c%c%c%c %02x -> %02x %c%c%c (%d)\n",
-			(n&RD)?'R':'-', (n&WR)?'W':'-',
-			(n&STP)?'P':'-', (n&STA)?'S':'-',
-			n & 0xFF, x & 0xFF,
-			(x&ACK)?'N':'A', (x&LOST)?'L':'-',
-			(x&BUSY)?'B':'-', c);
-		argc--;
-		argv++;
 	}
+#if TRACE_TXN
+	fprintf(stderr,"txn: %04x %04x\n",cmd, status); 
+#endif
+	*_status = status;
+	return 0;	
+}
 
+static int i2c_start(unsigned saddr) {
+	unsigned status;
+	if (i2c_txn((saddr & 0xFF) | STA | WR, &status))
+		return -1;
+	if (status & ACK) {
+		fprintf(stderr, "i2c: slave NAK'd\n");
+		return -1;
+	}
 	return 0;
+}
+
+static int i2c_stop(void) {
+	unsigned status;
+	return i2c_txn(STP, &status);
+}
+
+static int i2c_write(unsigned data) {
+	unsigned status;
+	if (i2c_txn((data & 0xFF) | WR, &status))
+		return -1;
+	if (status & ACK) {
+		fprintf(stderr, "i2c: slave NAK'd\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int i2c_read(unsigned *data, unsigned send_nak) {
+	unsigned status;
+	if (i2c_txn(RD | (send_nak ? RACK : 0), &status))
+		return -1;
+	*data = status & 0xFF;
+	return 0;
+}
+
+int i2c_wr16(unsigned saddr, unsigned addr, unsigned val) {
+	if (i2c_start(saddr)) return -1;
+	if (i2c_write(addr >> 8)) return -1;
+	if (i2c_write(addr)) return -1;
+	if (i2c_write(val >> 8)) return -1;
+	if (i2c_write(val)) return -1;
+	return i2c_stop();
+}
+
+int i2c_rd16(unsigned saddr, unsigned addr, unsigned *val) {
+	unsigned a, b;
+	if (i2c_start(saddr)) return -1;
+	if (i2c_write(addr >> 8)) return -1;
+	if (i2c_write(addr)) return -1;
+	if (i2c_start(saddr | 1)) return -1;
+	if (i2c_read(&a, 0)) return -1;
+	if (i2c_read(&b, 1)) return -1;
+	*val = (a << 8) | b;
+	return i2c_stop();
+}
+
+void i2c_init(void) {
+	jconnect();
 }
