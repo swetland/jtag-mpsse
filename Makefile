@@ -2,7 +2,7 @@
 CFLAGS := -g -Wall -O2
 LIBS := -lusb-1.0
 
-all: jtag i2c wri2c rdi2c
+all: jtag i2c wri2c rdi2c debug
 
 jtag.c: jtag.h
 jtag-mpsse.c: jtag.h
@@ -22,5 +22,9 @@ RDI2C_OBJS := rdi2c.o i2c_core.o jtag-mpsse.o
 rdi2c: $(RDI2C_OBJS)
 	$(CC) -o rdi2c $(RDI2C_OBJS) $(LIBS)
 
+DEBUG_OBJS := debug.o jtag-mpsse.o
+debug: $(DEBUG_OBJS)
+	$(CC) -o debug $(DEBUG_OBJS) $(LIBS)
+
 clean::
-	rm -f jtag *.o i2c wri2c rdi2c
+	rm -f jtag *.o i2c wri2c rdi2c debug
