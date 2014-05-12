@@ -54,9 +54,21 @@ void jwr(u32 addr, u32 val) {
 	jtag_dr_io(jtag, 36, u, &u);
 }
 
-void axi_connect(void) {
+#define DBG_IDCODE		     0x4158494d
+
+#define DBG_R_IDCODE                 0
+#define DBG_R_GETDATA                1
+#define DBG_R_GETADDR                2
+#define DBG_R_STATUS                 7
+
+#define DBG_W_SETADDR_READ           1
+#define DBG_W_SETADDR                2
+#define DBG_W_SETDATA_WRITE          3
+#define DBG_W_SETDATA_INCADDR_WRITE  4
+
+void mem_connect(void) {
 	jconnect();
-	if (jrd(0) != 0x4158494d) {
+	if (jrd(0) != DBG_IDCODE) {
 		fprintf(stderr,"axi master not detected\n");
 		exit(-1);
 	}
@@ -75,8 +87,8 @@ int main(int argc, char **argv) {
 				return -1;
 			}
 		}
-		axi_connect();
-		jwr(6, addr-4);
+		mem_connect();
+		jwr(DBG_W_SETADDR, addr-4);
 		for (;;) {
 			r = read(fd, &n, sizeof(n));
 			if (r < 0) {
@@ -86,7 +98,7 @@ int main(int argc, char **argv) {
 			}
 			if (r < 1)
 				break;
-			jwr(4, n);
+			jwr(DBG_W_SETDATA_INCADDR_WRITE, n);
 		}
 		close(fd);
 		return 0;
@@ -102,10 +114,10 @@ int main(int argc, char **argv) {
 				return -1;
 			}
 		}
-		axi_connect();
+		mem_connect();
 		while (count > 0) {
-			jwr(7, addr);
-			u32 n = jrd(1);
+			jwr(DBG_W_SETADDR_READ, addr);
+			u32 n = jrd(DBG_R_GETDATA);
 			write(fd, &n, sizeof(n));
 			addr += 4;
 			count--;
@@ -117,17 +129,17 @@ int main(int argc, char **argv) {
 		u32 addr = strtoul(argv[1], 0, 0);
 		u32 val = strtoul(argv[2], 0, 0);
 		if (argv[1][0] == '-') goto usage;
-		axi_connect();
-		jwr(6, addr);
-		jwr(5, val);
+		mem_connect();
+		jwr(DBG_W_SETADDR, addr);
+		jwr(DBG_W_SETDATA_WRITE, val);
 		return 0;
 	} else if (argc == 2) {
 		u32 addr = strtoul(argv[1], 0, 0);
 		u32 val;
 		if (argv[1][0] == '-') goto usage;
-		axi_connect();
-		jwr(7, addr);
- 		val = jrd(1);
+		mem_connect();
+		jwr(DBG_W_SETADDR_READ, addr);
+ 		val = jrd(DBG_R_GETDATA);
 		printf("%08x\n", val);
 		return 0;
 	}
