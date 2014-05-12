@@ -98,7 +98,12 @@ int main(int argc, char **argv) {
 			}
 			if (r < 1)
 				break;
+			//fprintf(stderr,"%08x\n",n);
 			jwr(DBG_W_SETDATA_INCADDR_WRITE, n);
+			usleep(5000);
+			//jwr(DBG_W_SETADDR, addr);
+			//jwr(DBG_W_SETDATA_WRITE, n);
+			//addr += 4;
 		}
 		close(fd);
 		return 0;
