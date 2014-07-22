@@ -40,6 +40,7 @@ struct device_info LIBRARY[] = {
 	{ ZYNQID(0x07), ZYNQMASK, 6, "xc7x020" },
 	{ ZYNQID(0x0c), ZYNQMASK, 6, "xc7x030" },
 	{ ZYNQID(0x11), ZYNQMASK, 6, "xc7x045" },
+	{ 0x13631093, 0xFFFFFFFF, 6, "xc7a100t" },
 };
 
 struct device_info *identify_device(u32 idcode) {
